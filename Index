@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>¿Me quedo o construyo salida? | Simulador (MVP)</title>
+  <meta name="description" content="Simulador de decisiones laborales: ¿me quedo, pivoteo, renegocio o construyo salida?" />
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.35;
+      background: Canvas;
+      color: CanvasText;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 20px; }
+    header { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+    h1 { font-size: 20px; margin: 0; }
+    .subtitle { opacity: .8; margin-top: 4px; font-size: 14px; }
+    .card {
+      margin-top: 16px;
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      border-radius: 14px;
+      padding: 16px;
+      background: color-mix(in oklab, Canvas 92%, CanvasText 8%);
+    }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      opacity: .9;
+    }
+    .progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: color-mix(in oklab, CanvasText 12%, Canvas 88%);
+      margin-top: 10px;
+    }
+    .bar { height: 100%; width: 0%; background: color-mix(in oklab, CanvasText 55%, Canvas 45%); }
+    .qtitle { font-size: 18px; margin: 0 0 6px 0; }
+    .help { margin: 0 0 14px 0; opacity: .82; }
+    .opts { display: grid; gap: 10px; margin-top: 10px; }
+    button.opt {
+      text-align: left;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      background: Canvas;
+      color: CanvasText;
+      cursor: pointer;
+      transition: transform 80ms ease;
+    }
+    button.opt:hover { transform: translateY(-1px); }
+    button.opt:active { transform: translateY(0px); }
+
+    .nav {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .nav button {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      background: color-mix(in oklab, Canvas 92%, CanvasText 8%);
+      color: CanvasText;
+      cursor: pointer;
+    }
+    .nav button.primary {
+      background: CanvasText;
+      color: Canvas;
+      border-color: CanvasText;
+    }
+    .tiny { font-size: 12px; opacity: .75; }
+    .result h2 { margin: 0 0 8px 0; }
+    .result .summary { margin: 0 0 14px 0; opacity: .85; }
+    .cols { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 780px) { .cols { grid-template-columns: 1fr 1fr; } }
+    .box {
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      border-radius: 14px;
+      padding: 12px;
+      background: color-mix(in oklab, Canvas 95%, CanvasText 5%);
+    }
+    .box h3 { margin: 0 0 8px 0; font-size: 15px; }
+    ul { margin: 0; padding-left: 18px; }
+    li { margin: 6px 0; }
+    .narr p { margin: 10px 0 0 0; opacity: .9; }
+    .foot {
+      margin-top: 14px;
+      opacity: .7;
+      font-size: 12px;
+    }
+    details.debug { margin-top: 12px; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: color-mix(in oklab, Canvas 92%, CanvasText 8%);
+      border: 1px solid color-mix(in oklab, CanvasText 18%, Canvas 82%);
+      border-radius: 12px;
+      padding: 10px;
+      overflow: auto;
+      max-height: 260px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>¿Me quedo o construyo salida?</h1>
+        <div class="subtitle">Simulador laboral (MVP). No decide por ti: te devuelve estructura y un plan A/B.</div>
+      </div>
+      <div class="row">
+        <span class="pill" id="pillStep">0/18</span>
+        <span class="pill" id="pillMode">Modo: en progreso</span>
+      </div>
+    </header>
+
+    <div class="progress" aria-label="Progreso">
+      <div class="bar" id="bar"></div>
+    </div>
+
+    <main class="card" id="app" aria-live="polite"></main>
+
+    <div class="foot">
+      Privacidad: este prototipo no envía datos a ningún servidor. Todo se calcula en tu navegador.
+    </div>
+  </div>
+
+<script>
+/**
+ * Árbol v0.3 (Trabajo) | 18 preguntas lineales + resultado por banderas.
+ * Más adelante puedes ramificar por "next" distinto por opción si quieres.
+ */
+const TREE = {
+  meta: {
+    id: "trabajo_v03_es",
+    title: "¿Me quedo o construyo salida?",
+    version: "0.3",
+    total: 18
+  },
+  flow: ["Q1","Q2","Q3","Q4","Q5","Q6","Q7","Q8","Q9","Q10","Q11","Q12","Q13","Q14","Q15","Q16","Q17","Q18"],
+  nodes: {
+    Q1: {
+      id: "Q1",
+      title: "No negociables",
+      text: "¿Hay un “no negociable” activamente roto en este trabajo?",
+      help: "Si la respuesta es sí, no decide por ti, pero cambia la prioridad.",
+      options: [
+        { label: "Sí", flags: ["rojo_no_negociable"] },
+        { label: "No", flags: [] },
+        { label: "No estoy seguro", flags: ["rojo_dudoso"] }
+      ]
+    },
+    Q2: {
+      id: "Q2",
+      title: "Sostenibilidad a 12 meses",
+      text: "Si todo siguiera igual, ¿esto sería aceptable para ti dentro de 12 meses?",
+      help: "“Aceptable” no es “me encanta”. Es “no me destruye”.",
+      options: [
+        { label: "Sí", flags: ["sostenible"] },
+        { label: "Apenas", flags: ["sostenibilidad_baja"] },
+        { label: "No", flags: ["sostenibilidad_muy_baja"] },
+        { label: "No sé", flags: ["zona_gris"] }
+      ]
+    },
+    Q3: {
+      id: "Q3",
+      title: "Costo en el corto plazo",
+      text: "Si sigues 3 meses más, ¿el costo tiende a acumularse o a estabilizarse?",
+      help: "Costo = energía, salud, reputación, aprendizaje, autoestima laboral.",
+      options: [
+        { label: "Se acumula", flags: ["costo_acumulativo"] },
+        { label: "Se estabiliza", flags: ["costo_estable"] },
+        { label: "No sé", flags: ["zona_gris"] }
+      ]
+    },
+    Q4: {
+      id: "Q4",
+      title: "Control real",
+      text: "¿Hay algo importante que dependa realmente de ti cambiar?",
+      help: "“Depende de mí” = palancas concretas, no esperanza.",
+      options: [
+        { label: "Sí", flags: ["control_alto"] },
+        { label: "Parcial", flags: ["control_mixto"] },
+        { label: "No", flags: ["sin_control"] }
+      ]
+    },
+    Q5: {
+      id: "Q5",
+      title: "Palancas en 6–8 semanas",
+      text: "¿Tienes palancas reales para mejorar tu situación en 6–8 semanas?",
+      help: "Palancas = conversación, cambio de tareas, límites, equipo, horario, proceso.",
+      options: [
+        { label: "Sí", flags: ["palancas_altas"] },
+        { label: "Parcial", flags: ["palancas_medias"] },
+        { label: "No", flags: ["palancas_bajas"] }
+      ]
+    },
+    Q6: {
+      id: "Q6",
+      title: "Poder para cambiar",
+      text: "¿La persona o estructura que decide sobre tu rol y condiciones tiene poder real para cambiar esto?",
+      help: "Si no hay poder arriba, a veces el esfuerzo solo agrega desgaste.",
+      options: [
+        { label: "Sí", flags: ["palanca_jerarquica"] },
+        { label: "Parcial", flags: ["palanca_jerarquica_mixta"] },
+        { label: "No", flags: ["sin_palanca_jerarquica"] }
+      ]
+    },
+    Q7: {
+      id: "Q7",
+      title: "Métrica y fecha",
+      text: "¿Puedes definir 1–2 métricas y una fecha de revisión en 6–12 semanas?",
+      help: "Métrica = señal observable (carga, tareas, autonomía, feedback, salario, etc.).",
+      options: [
+        { label: "Sí", flags: ["tiene_metricas"] },
+        { label: "No", flags: ["deriva"] }
+      ]
+    },
+    Q8: {
+      id: "Q8",
+      title: "Transferibilidad",
+      text: "Si te fueras mañana, ¿te llevas algo transferible de estos meses?",
+      help: "Transferible = habilidades, portfolio, credencial, casos, red.",
+      options: [
+        { label: "Sí", flags: ["transferible_alto"] },
+        { label: "Parcial", flags: ["transferible_medio"] },
+        { label: "No", flags: ["estancamiento"] }
+      ]
+    },
+    Q9: {
+      id: "Q9",
+      title: "Valoración y respeto",
+      text: "En este trabajo, hoy te sientes…",
+      help: "Esto no es ego. Es información sobre tu moneda interna.",
+      options: [
+        { label: "Valorado y respetado de forma consistente", flags: ["valoracion_alta"] },
+        { label: "A veces sí, a veces no", flags: ["valoracion_inestable"] },
+        { label: "Poco valorado o poco respetado", flags: ["desvalorizacion"] }
+      ]
+    },
+    Q10: {
+      id: "Q10",
+      title: "Presión financiera",
+      text: "Con tu ingreso actual, ¿lo básico está cubierto sin tensión constante?",
+      help: "“Justo” cuenta. Te empuja a decisiones defensivas.",
+      options: [
+        { label: "Sí", flags: ["finanzas_estables"] },
+        { label: "Justo", flags: ["presion_financiera_media"] },
+        { label: "No", flags: ["presion_financiera_alta"] }
+      ]
+    },
+    Q11: {
+      id: "Q11",
+      title: "Runway",
+      text: "Si dejaras este trabajo, ¿cuántos meses podrías cubrir lo básico sin entrar en crisis?",
+      help: "No es para asustar. Es para definir el tipo de salida.",
+      options: [
+        { label: "0–1 mes", flags: ["runway_critico"] },
+        { label: "2–3 meses", flags: ["runway_bajo"] },
+        { label: "4–6 meses", flags: ["runway_medio"] },
+        { label: "6+ meses", flags: ["runway_alto"] }
+      ]
+    },
+    Q12: {
+      id: "Q12",
+      title: "Mercado salarial",
+      text: "En relación con el mercado (mismo rol, experiencia y zona), tu compensación está…",
+      help: "Si no sabes, el simulador lo convierte en tarea.",
+      options: [
+        { label: "Arriba", flags: ["pago_arriba_mercado"] },
+        { label: "En línea", flags: ["pago_en_linea"] },
+        { label: "Abajo", flags: ["bajo_mercado"] },
+        { label: "No sé", flags: ["dato_faltante_mercado", "zona_gris"] }
+      ]
+    },
+    Q13: {
+      id: "Q13",
+      title: "Renegociación",
+      text: "Si te ofrecieran un cambio concreto (salario, rol o condiciones) que resuelva lo principal, ¿te quedarías 3–6 meses más?",
+      help: "Esto define si hay camino de renegociación o si el problema es más profundo.",
+      options: [
+        { label: "Sí", flags: ["renegociable"] },
+        { label: "No", flags: ["no_renegociable"] },
+        { label: "No sé", flags: ["zona_gris"] }
+      ]
+    },
+    Q14: {
+      id: "Q14",
+      title: "Contexto externo",
+      text: "Tu empresa o sector en este momento está…",
+      help: "El contexto cambia la estrategia aunque tú estés bien.",
+      options: [
+        { label: "Creciendo", flags: ["mercado_favorable"] },
+        { label: "Estable", flags: ["mercado_neutro"] },
+        { label: "En recortes o congelamiento", flags: ["mercado_hostil"] },
+        { label: "No sé", flags: ["dato_faltante_contexto", "zona_gris"] }
+      ]
+    },
+    Q15: {
+      id: "Q15",
+      title: "Probabilidad de salida",
+      text: "¿Qué tan probable es conseguir algo razonable en 60–90 días?",
+      help: "“Razonable” = viable, no perfecto.",
+      options: [
+        { label: "Alta", flags: ["empleabilidad_alta"] },
+        { label: "Media", flags: ["empleabilidad_media"] },
+        { label: "Baja", flags: ["empleabilidad_baja"] },
+        { label: "No sé", flags: ["zona_gris"] }
+      ]
+    },
+    Q16: {
+      id: "Q16",
+      title: "Kit de salida",
+      text: "Hoy, tu “kit de salida” está…",
+      help: "No es talento: es preparación y movimiento.",
+      options: [
+        { label: "Activo (aplico, entrevisto o tengo leads reales)", flags: ["kit_salida_activo"] },
+        { label: "A medias (materiales incompletos o sin movimiento)", flags: ["kit_salida_medio"] },
+        { label: "Débil (nada listo o sin energía para activar)", flags: ["kit_salida_debil"] }
+      ]
+    },
+    Q17: {
+      id: "Q17",
+      title: "Irreversibilidad",
+      text: "Quedarte 3 meses más te ata de forma difícil de deshacer…",
+      help: "Irreversible = contrato, promesas, deuda, responsabilidad que te encierra, bonus encadenado.",
+      options: [
+        { label: "Reversible", flags: ["irreversibilidad_baja"] },
+        { label: "Semi", flags: ["irreversibilidad_media"] },
+        { label: "Irreversible", flags: ["irreversibilidad_alta"] }
+      ]
+    },
+    Q18: {
+      id: "Q18",
+      title: "Tu modo actual",
+      text: "¿Qué frase te describe mejor hoy?",
+      help: "Esto clasifica tu estado. No sentencia tu decisión.",
+      options: [
+        { label: "“Quiero quedarme, pero no así.”", flags: ["modo_pivot"] },
+        { label: "“Quiero irme, pero no puedo todavía.”", flags: ["modo_salida_en_construccion"] },
+        { label: "“No sé qué quiero.”", flags: ["modo_zona_gris", "zona_gris"] },
+        { label: "“Estoy en automático.”", flags: ["modo_automatico"] }
+      ]
+    }
+  }
+};
+
+// ---------- Estado ----------
+const state = {
+  idx: 0,
+  answers: [] // { qid, optionIndex, flagsAdded, label }
+};
+
+function has(flag) {
+  return Boolean(recomputeFlags()[flag]);
+}
+function any(flags) {
+  const f = recomputeFlags();
+  return flags.some(x => Boolean(f[x]));
+}
+function recomputeFlags() {
+  // Recalcula desde cero (simple y robusto para Back).
+  const flags = {};
+  for (const a of state.answers) {
+    for (const fl of a.flagsAdded) flags[fl] = true;
+  }
+  return flags;
+}
+
+// ---------- Resultado ----------
+function computeOutcome() {
+  const flags = recomputeFlags();
+
+  const runwayOk = Boolean(flags.runway_medio || flags.runway_alto);
+  const runwayLow = Boolean(flags.runway_critico || flags.runway_bajo);
+  const kitActive = Boolean(flags.kit_salida_activo);
+  const kitWeak = Boolean(flags.kit_salida_debil);
+  const empleabWeak = Boolean(flags.empleabilidad_baja);
+  const marketHostile = Boolean(flags.mercado_hostil);
+
+  // F5: salida prioritaria (rápida o controlada)
+  if (flags.rojo_no_negociable && (runwayOk || kitActive)) return "F5";
+  if (flags.costo_acumulativo && flags.irreversibilidad_alta && (flags.sin_control || flags.palancas_bajas)) return "F5";
+
+  // F4: salida en construcción (sin pánico)
+  if ((flags.sostenibilidad_muy_baja || flags.costo_acumulativo) && (runwayLow || kitWeak || empleabWeak || marketHostile)) return "F4";
+  if (flags.modo_salida_en_construccion && (runwayLow || kitWeak)) return "F4";
+
+  // F3: renegociar o salir
+  if ((flags.bajo_mercado || flags.desvalorizacion) &&
+      flags.renegociable &&
+      (flags.palancas_altas || flags.palancas_medias) &&
+      !flags.rojo_no_negociable) {
+    return "F3";
+  }
+
+  // F2: pivot interno
+  if (flags.modo_pivot &&
+      (flags.palancas_altas || flags.palancas_medias) &&
+      flags.tiene_metricas &&
+      !(flags.costo_acumulativo && flags.irreversibilidad_alta)) {
+    return "F2";
+  }
+
+  // F1: quedarme con límites
+  if ((flags.sostenible || flags.sostenibilidad_baja) &&
+      (flags.control_alto || flags.control_mixto) &&
+      flags.tiene_metricas &&
+      !flags.rojo_no_negociable &&
+      !flags.sostenibilidad_muy_baja) {
+    return "F1";
+  }
+
+  // F6: zona gris consciente
+  return "F6";
+}
+
+function horizonText(flags) {
+  // Pequeña ayuda: si hay deriva o zona gris, usamos 14 días o 6 semanas.
+  if (flags.modo_zona_gris || flags.zona_gris || flags.dato_faltante_mercado || flags.dato_faltante_contexto) return "en 14 días";
+  return "en 8 semanas";
+}
+
+// ---------- Plantillas de resultados (checklist + narrado) ----------
+function renderResult() {
+  const flags = recomputeFlags();
+  const outcome = computeOutcome();
+  const h = horizonText(flags);
+
+  const results = {
+    F1: {
+      title: "F1) Quedarme con límites (Stay con revisión)",
+      summary: "Tu situación parece sostenible y tienes palancas reales. La clave es quedarte con método: métricas y fecha.",
+      planA: () => ([
+        `Define 1 objetivo concreto para las próximas 6–12 semanas (ejemplo: mejorar autonomía, reducir carga, mover tareas).`,
+        `Elige 1–2 métricas observables (ejemplo: horas reales, tipo de tareas, feedback, autonomía).`,
+        `Fija una fecha de revisión ${h} y ponla en calendario.`,
+        `Ejecuta 1 palanca prioritaria esta semana (la acción con más impacto y menor fricción).`
+      ]),
+      planB: () => ([
+        `Actualiza CV/LinkedIn en 60–90 minutos y guarda una versión lista para enviar.`,
+        `Anota 3 roles o empresas posibles, sin aplicar todavía (solo mantener opciones vivas).`,
+        `Si en la revisión no se cumple una condición mínima (ejemplo: métrica mejora o cambio acordado), activas salida en construcción.`
+      ]),
+      narr: () => ([
+        "Este plan funciona porque convierte “quedarme” en una decisión con reloj. No dependes de un día bueno o malo, sino de señales concretas.",
+        "La ventaja de métricas y fecha es doble: evitas quedarte por inercia y evitas irte por un pico de cansancio. Te das una oportunidad real, sin regalar meses al azar.",
+        "El Plan B es pequeño a propósito. Mantener opciones vivas hace que quedarte sea una elección, no una trampa."
+      ])
+    },
+
+    F2: {
+      title: "F2) Pivot interno (quedarme, pero distinto)",
+      summary: "Quieres quedarte, pero no así. Hay palancas, así que el movimiento correcto es rediseñar el trabajo para ti con un experimento corto.",
+      planA: () => ([
+        "Escribe en 5 líneas qué significa “no así” (qué te drena y qué tendría que cambiar).",
+        "Elige 1 cambio estructural de alto impacto (tareas, límites, equipo, autonomía, horario).",
+        "Ten una conversación con pedido claro y plazo (qué necesitas y para cuándo).",
+        `Define una métrica simple y revisa ${h}.`
+      ]),
+      planB: () => ([
+        "Activa salida tibia en paralelo: CV/LinkedIn listos y 5 contactos o 5 aplicaciones en 14 días.",
+        "Si la respuesta interna es “no se puede” o no hay poder real, pasas a salida en construcción sin discutir con la realidad."
+      ]),
+      narr: () => ([
+        "Pivotar no es aguantar. Es admitir algo específico: quizá el problema no es el trabajo en sí, sino su diseño actual para ti.",
+        "Un experimento corto con métricas te da claridad rápida: o se desbloquea y mejora tu día a día, o confirmas con evidencia que no hay palancas suficientes.",
+        "El Plan B evita quedarte esperando promesas. Te protege del “ya veremos” y te devuelve poder."
+      ])
+    },
+
+    F3: {
+      title: "F3) Renegociar o salir (con fecha límite)",
+      summary: "Hay señales de pago bajo mercado o desvalorización, pero parece haber margen para renegociar. Se hace con evidencia y con límite de tiempo.",
+      planA: () => {
+        const items = [
+          "Prepara evidencia en una página: 3 logros medibles, responsabilidades reales y ejemplos concretos.",
+        ];
+        if (flags.bajo_mercado || flags.dato_faltante_mercado) {
+          items.push("Consigue un dato de mercado (2–3 referencias razonables) y define tu banda objetivo.");
+        }
+        items.push("Define tu pedido en una sola frase (salario, rol o condiciones) y tu mínimo aceptable.");
+        items.push(`Agenda conversación y fija fecha de respuesta ${h}.`);
+        return items;
+      },
+      planB: () => ([
+        "Activa salida en paralelo sin anunciar: CV/LinkedIn + 10 contactos o 10 aplicaciones en 14 días.",
+        "Si para la fecha límite no hay avance real (no promesas), pasas a salida en construcción."
+      ]),
+      narr: () => ([
+        "Cuando el problema es económico o de reconocimiento, no se arregla con actitud. Necesitas ajustar condiciones o cambiar de lugar.",
+        "La renegociación con evidencia transforma lo emocional en verificable: lo que aportas, lo que pides, y cuándo se decide. Eso reduce desgaste mental.",
+        "El Plan B evita que te quedes por conversaciones eternas. Si hay mejora, te quedas mejor. Si no la hay, te vas con preparación."
+      ])
+    },
+
+    F4: {
+      title: "F4) Salida en construcción (exit plan sin pánico)",
+      summary: "Quedarte como estás tiene costo, pero salir hoy podría empeorarte por runway, contexto o preparación. La estrategia es construir salida por orden.",
+      planA: () => ([
+        "Reduce irreversibilidad desde hoy: evita compromisos que te aten (promesas largas, proyectos encadenados).",
+        "Cuida energía: define un límite semanal para no llegar vacío al cambio."
+      ]),
+      planB: () => {
+        const items = [];
+        if (flags.runway_critico || flags.runway_bajo || flags.presion_financiera_alta) {
+          items.push("Prioridad runway: elige 1 acción concreta para aumentar margen en 14 días (recorte, ingreso extra, negociar pagos).");
+        }
+        items.push("Arma kit de salida en 72 horas: CV/LinkedIn, lista de logros, referencias.");
+        if (flags.kit_salida_debil) {
+          items.push("Hazlo mínimo viable: una versión simple y enviable primero, luego mejoras.");
+        }
+        items.push("Ritmo sostenible: 3–5 aplicaciones por semana o 5 contactos por semana durante 4 semanas.");
+        items.push(`Define un criterio de avance y revisa ${h} (si no hay señales, ajustas estrategia o aceleras).`);
+        return items;
+      },
+      narr: () => ([
+        "Este plan evita dos errores: quedarte indefinidamente por miedo, o salir sin red y entrar en caos.",
+        "El orden importa. Primero runway y kit de salida porque te devuelven estabilidad. Luego movimiento consistente porque el cambio real se construye con ritmo, no con un impulso heroico.",
+        "Reducir irreversibilidad es clave: no quieres que el trabajo te amarre justo cuando estás tratando de recuperar opciones."
+      ])
+    },
+
+    F5: {
+      title: "F5) Salida prioritaria (rápida o controlada)",
+      summary: "Hay señales fuertes de daño o atrapamiento. Aquí la prioridad es reducir exposición y recuperar opciones cuanto antes.",
+      planA: () => ([
+        "Si no puedes irte aún, define 2 límites no negociables temporales para sobrevivir mientras construyes salida.",
+        "Documenta lo mínimo necesario para no quedar atrapado en urgencias constantes."
+      ]),
+      planB: () => {
+        const items = [];
+        if (flags.runway_medio || flags.runway_alto) {
+          items.push("Salida rápida planificada: diseña una transición de 2–6 semanas (sin incendiar puentes).");
+        } else {
+          items.push("Salida controlada: mantén ingreso mientras preparas kit y activas el mercado (sin compromisos nuevos).");
+        }
+        items.push("Kit de salida express en 72 horas: CV/LinkedIn, logros, 3 referencias.");
+        items.push("Primer movimiento real en 7 días: 10 contactos o 10 aplicaciones.");
+        items.push("Reduce exposición desde hoy: evita compromisos irreversibles y conversaciones que solo dilatan.");
+        return items;
+      },
+      narr: () => ([
+        "Aquí la pregunta no es “¿puedo aguantar un poco más?”, sino “¿cuánto me cuesta cada semana extra?”. Cuando el costo se acumula, el desgaste crece con interés compuesto.",
+        "La salida prioritaria no significa impulsividad. Significa actuar antes de quedar vacío. Lo importante es recuperar opciones y quitarte del daño.",
+        "El kit y el primer movimiento cortan el bucle mental. Cuando hay pasos concretos, la sensación de atrapamiento baja."
+      ])
+    },
+
+    F6: {
+      title: "F6) Zona gris consciente (14 días para salir del “no sé”)",
+      summary: "No tienes datos suficientes o hay demasiada incertidumbre. La estrategia es recolectar información útil y repetir el simulador.",
+      planA: () => ([
+        "Durante 7 días, registra señales internas: energía, estrés, horas reales, trato recibido, aprendizaje.",
+        "Ten una conversación con 2 preguntas: “¿Qué se puede cambiar en 6–8 semanas?” y “¿Qué no se puede cambiar?”.",
+        "Define una métrica mínima, aunque sea simple (por ejemplo: carga semanal o tipo de tareas)."
+      ]),
+      planB: () => {
+        const items = [];
+        if (flags.dato_faltante_mercado) items.push("Mercado (día 1–2): averigua tu banda salarial con 2–3 referencias razonables.");
+        if (flags.dato_faltante_contexto) items.push("Contexto (día 1–2): confirma si tu sector está estable o en recortes (para ajustar estrategia).");
+        items.push("Kit (día 3–4): CV/LinkedIn actualizado + 10 logros en bullets.");
+        items.push("Alternativas (día 11–14): 5 contactos o 5 aplicaciones para medir respuesta real del mercado.");
+        items.push("Repite el simulador en 14 días con datos nuevos y decide con más claridad.");
+        return items;
+      },
+      narr: () => ([
+        "“No sé” suele significar algo simple: faltan datos y tu mente no quiere apostar a ciegas. Eso es razonable.",
+        "El riesgo es la deriva: seguir por inercia y pagar costos sin darte cuenta. Por eso el objetivo aquí es convertir incertidumbre difusa en información concreta.",
+        "Cuando miras mercado, runway, kit y señales internas, tu decisión deja de ser una pelea emocional y se vuelve una elección con contexto."
+      ])
+    }
+  };
+
+  const r = results[outcome];
+  const planA = r.planA(flags);
+  const planB = r.planB(flags);
+
+  const debugOn = new URLSearchParams(location.search).get("debug") === "1";
+
+  document.getElementById("pillMode").textContent = `Resultado: ${outcome}`;
+
+  return `
+    <section class="result">
+      <h2>${escapeHtml(r.title)}</h2>
+      <p class="summary">${escapeHtml(r.summary)}</p>
+
+      <div class="cols">
+        <div class="box">
+          <h3>Plan A: Si me quedo</h3>
+          <ul>${planA.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+        </div>
+        <div class="box">
+          <h3>Plan B: Si me voy</h3>
+          <ul>${planB.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+        </div>
+      </div>
+
+      <div class="box narr" style="margin-top:12px">
+        <h3>Por qué estos pasos</h3>
+        ${r.narr(flags).map(p => `<p>${escapeHtml(p)}</p>`).join("")}
+      </div>
+
+      <div class="nav">
+        <button onclick="restart()">Reiniciar</button>
+        <button class="primary" onclick="copySummary()">Copiar resultado</button>
+      </div>
+
+      ${debugOn ? `
+        <details class="debug">
+          <summary>Debug (banderas y respuestas)</summary>
+          <pre>${escapeHtml(JSON.stringify({ flags, answers: state.answers }, null, 2))}</pre>
+        </details>
+      ` : ""}
+
+      <p class="tiny" style="margin-top:10px">
+        Nota: este prototipo no reemplaza asesoría legal, médica o profesional. Su propósito es darte claridad estructural.
+      </p>
+    </section>
+  `;
+}
+
+// ---------- Render de pregunta ----------
+function renderQuestion() {
+  const qid = TREE.flow[state.idx];
+  const node = TREE.nodes[qid];
+
+  document.getElementById("pillStep").textContent = `${state.idx + 1}/${TREE.meta.total}`;
+  document.getElementById("pillMode").textContent = "Modo: en progreso";
+
+  const pct = Math.round(((state.idx) / (TREE.meta.total)) * 100);
+  document.getElementById("bar").style.width = `${pct}%`;
+
+  return `
+    <section>
+      <h2 class="qtitle">${escapeHtml(node.title)} (${escapeHtml(node.id)})</h2>
+      <p class="help">${escapeHtml(node.text)}<br><span class="tiny">${escapeHtml(node.help)}</span></p>
+
+      <div class="opts" role="list">
+        ${node.options.map((opt, i) => `
+          <button class="opt" role="listitem" onclick="choose(${i})">
+            ${escapeHtml(opt.label)}
+          </button>
+        `).join("")}
+      </div>
+
+      <div class="nav">
+        <div class="row">
+          <button onclick="back()" ${state.idx === 0 ? "disabled" : ""}>Atrás</button>
+          <button onclick="restart()">Reiniciar</button>
+        </div>
+        <span class="tiny">Consejo: responde pensando en 3–6 meses, no en el escenario perfecto.</span>
+      </div>
+    </section>
+  `;
+}
+
+// ---------- Acciones UI ----------
+function choose(optionIndex) {
+  const qid = TREE.flow[state.idx];
+  const node = TREE.nodes[qid];
+  const opt = node.options[optionIndex];
+
+  state.answers.push({
+    qid,
+    optionIndex,
+    label: opt.label,
+    flagsAdded: opt.flags || []
+  });
+
+  state.idx += 1;
+
+  if (state.idx >= TREE.meta.total) {
+    document.getElementById("bar").style.width = `100%`;
+    document.getElementById("app").innerHTML = renderResult();
+  } else {
+    document.getElementById("app").innerHTML = renderQuestion();
+  }
+}
+
+function back() {
+  if (state.idx === 0) return;
+  state.answers.pop();
+  state.idx -= 1;
+  document.getElementById("app").innerHTML = renderQuestion();
+}
+
+function restart() {
+  state.idx = 0;
+  state.answers = [];
+  document.getElementById("bar").style.width = `0%`;
+  document.getElementById("app").innerHTML = renderQuestion();
+  document.getElementById("pillStep").textContent = `0/${TREE.meta.total}`;
+  document.getElementById("pillMode").textContent = "Modo: en progreso";
+}
+
+function copySummary() {
+  const flags = recomputeFlags();
+  const outcome = computeOutcome();
+  const text = [
+    `Resultado: ${outcome}`,
+    `Banderas: ${Object.keys(flags).sort().join(", ")}`,
+    "",
+    "Respuestas:",
+    ...state.answers.map(a => `${a.qid}: ${a.label}`)
+  ].join("\n");
+
+  navigator.clipboard?.writeText(text).then(() => {
+    alert("Copiado al portapapeles.");
+  }).catch(() => {
+    // Fallback
+    prompt("Copia este texto:", text);
+  });
+}
+
+// ---------- Helpers ----------
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+// ---------- Init ----------
+document.getElementById("app").innerHTML = renderQuestion();
+document.getElementById("pillStep").textContent = `1/${TREE.meta.total}`;
+</script>
+</body>
+</html>
